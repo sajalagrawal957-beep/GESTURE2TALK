@@ -1,4 +1,4 @@
-nnnnn
+
 # app.py
 
 from flask import Flask, request, jsonify
@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ── Load model ONCE when server starts ──────────────────────────────────────
-MODEL_PATH = "model/gesture_model.h5"
+MODEL_PATH = "gesture_model.h5"
 
 if os.path.exists(MODEL_PATH):
     predictor = GesturePredictor(MODEL_PATH)

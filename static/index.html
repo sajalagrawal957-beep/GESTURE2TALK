@@ -482,23 +482,61 @@ video {
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
 <script>
 const BASE = "http://127.0.0.1:5000";
 
 function startApp() {
     document.getElementById("landing").style.display = "none";
     document.getElementById("app").style.display = "flex";
-    navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => document.getElementById("video").srcObject = stream)
-        .catch(err => alert("Camera error: " + err));
+    startMediaPipe();
 }
 
-async function predict() {
+function startMediaPipe() {
+    const videoEl = document.getElementById("video");
+
+    const hands = new Hands({
+        locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7
+    });
+
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoEl, {
+        onFrame: async () => { await hands.send({ image: videoEl }); },
+        width: 640,
+        height: 480
+    });
+
+    camera.start();
+}
+
+async function onResults(results) {
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        document.getElementById("camBox").classList.remove("detected");
+        return;
+    }
+
+    const landmarks = [];
+    for (const lm of results.multiHandLandmarks[0]) {
+        landmarks.push(lm.x);
+        landmarks.push(lm.y);
+        landmarks.push(lm.z);
+    }
+
     try {
         let res = await fetch(BASE + "/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ landmarks: Array(63).fill(0.5) })
+            body: JSON.stringify({ landmarks: landmarks })
         });
         let data = await res.json();
 
@@ -511,24 +549,17 @@ async function predict() {
         document.getElementById("confFill").style.width = conf + "%";
         document.getElementById("sentenceText").innerText = data.sentence || "";
 
-        if (data.letter) {
-            document.getElementById("camBox").classList.add("detected");
-        } else {
-            document.getElementById("camBox").classList.remove("detected");
-        }
+        document.getElementById("camBox").classList.add("detected");
     } catch(e) {}
 }
-setInterval(predict, 300);
 
 async function speak() {
     let text = document.getElementById("sentenceText").innerText;
-    
-      if (!text) {
+    if (!text) {
         let res = await fetch(BASE + "/sentence/get");
         let data = await res.json();
         text = data.sentence;
     }
-
     if (!text) { alert("do some gestures"); return; }
     await fetch(BASE + "/speak", {
         method: "POST",
@@ -584,5 +615,3 @@ async function speakWord(word) {
     });
 }
 </script>
-</body>
-</html>
